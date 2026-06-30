@@ -1,7 +1,10 @@
 import argparse
+import os
 import sys
 
 import requests
+
+API_KEY_ENV_VAR = "MAPQUEST_API_KEY"
 
 # HTTPS only; query parameters are encoded by requests.
 MAPQUEST_GEOCODE_URL = "https://www.mapquestapi.com/geocoding/v1/address"
@@ -84,16 +87,29 @@ def main():
         description="Retrieve latitude and longitude for a given city or town using the MapQuest Geocoding API."
     )
     parser.add_argument("location", help="City or town name")
-    parser.add_argument("--api-key", required=True, help="MapQuest API key")
+    parser.add_argument(
+        "--api-key",
+        help=f"MapQuest API key (defaults to the {API_KEY_ENV_VAR} environment variable)",
+    )
     args = parser.parse_args()
 
     location = (args.location or "").strip()
     if not location:
         parser.error("location must not be empty.")
 
-    api_key = (args.api_key or "").strip()
-    if not api_key:
-        parser.error("--api-key must not be empty.")
+    if args.api_key is not None:
+        # An explicit flag is treated as authoritative; an empty value is an error
+        # rather than silently falling back to the environment.
+        api_key = args.api_key.strip()
+        if not api_key:
+            parser.error("--api-key must not be empty.")
+    else:
+        api_key = (os.environ.get(API_KEY_ENV_VAR) or "").strip()
+        if not api_key:
+            parser.error(
+                f"an API key is required: pass --api-key or set the {API_KEY_ENV_VAR} "
+                "environment variable."
+            )
 
     lat, lng = get_coordinates(api_key, location)
 
