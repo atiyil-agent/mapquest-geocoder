@@ -7,6 +7,20 @@ city/town name into latitude/longitude via the MapQuest Geocoding API. The singl
 console entry point is `mapquest-geocode` (defined in `setup.py`, implemented in
 `mapquest_geocoder/geocode.py`).
 
+### Before starting code changes: sync with upstream
+This repo is a fork of `atiyil/mapquest-geocoder`. Always pull the latest from
+upstream into `main` before beginning any new work, so your branch is based on the
+most recent code:
+- Add the upstream remote once (it is not configured by default on a fresh checkout):
+  `git remote get-url upstream || git remote add upstream https://github.com/atiyil/mapquest-geocoder.git`
+- Sync `main`:
+  `git fetch upstream`
+  `git checkout main`
+  `git merge --ff-only upstream/main` (use a regular `git merge upstream/main` if the
+  fork has diverged and a fast-forward is not possible)
+  `git push origin main`
+- Then create your feature branch off the freshly synced `main`.
+
 ### Environment
 - Development uses a virtualenv at `.venv` (gitignored). The startup update script
   creates/updates it and installs the package in editable mode (`pip install -e .`),
