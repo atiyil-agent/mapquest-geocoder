@@ -1,10 +1,16 @@
 import io
+import os
 import unittest
 from unittest.mock import MagicMock, patch
 
 import requests
 
-from mapquest_geocoder.geocode import MAPQUEST_GEOCODE_URL, get_coordinates, main
+from mapquest_geocoder.geocode import (
+    API_KEY_ENV_VAR,
+    MAPQUEST_GEOCODE_URL,
+    get_coordinates,
+    main,
+)
 
 
 class TestGetCoordinates(unittest.TestCase):
@@ -128,9 +134,58 @@ class TestMain(unittest.TestCase):
         self.assertEqual(ctx.exception.code, 2)
 
     def test_empty_api_key_exits_with_code_2(self):
-        with patch("sys.argv", ["prog", "Paris", "--api-key", "  "]):
-            with self.assertRaises(SystemExit) as ctx:
-                main()
+        with patch.dict(os.environ, {API_KEY_ENV_VAR: "env_key"}, clear=False):
+            with patch("sys.argv", ["prog", "Paris", "--api-key", "  "]):
+                with self.assertRaises(SystemExit) as ctx:
+                    main()
+        # An explicit empty flag is an error even when the env var is set.
+        self.assertEqual(ctx.exception.code, 2)
+
+    def test_api_key_from_environment_when_flag_absent(self):
+        payload = {
+            "info": {"statuscode": 0},
+            "results": [{"locations": [{"latLng": {"lat": 5.0, "lng": 6.0}}]}],
+        }
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = payload
+
+        with patch.dict(os.environ, {API_KEY_ENV_VAR: "env_key"}, clear=False):
+            with patch(
+                "mapquest_geocoder.geocode.requests.get", return_value=mock_resp
+            ) as mock_get:
+                with patch("sys.argv", ["prog", "Paris"]):
+                    with self.assertRaises(SystemExit) as ctx:
+                        main()
+
+        self.assertEqual(ctx.exception.code, 0)
+        self.assertEqual(mock_get.call_args.kwargs["params"]["key"], "env_key")
+
+    def test_flag_overrides_environment(self):
+        payload = {
+            "info": {"statuscode": 0},
+            "results": [{"locations": [{"latLng": {"lat": 5.0, "lng": 6.0}}]}],
+        }
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = payload
+
+        with patch.dict(os.environ, {API_KEY_ENV_VAR: "env_key"}, clear=False):
+            with patch(
+                "mapquest_geocoder.geocode.requests.get", return_value=mock_resp
+            ) as mock_get:
+                with patch("sys.argv", ["prog", "Paris", "--api-key", "flag_key"]):
+                    with self.assertRaises(SystemExit):
+                        main()
+
+        self.assertEqual(mock_get.call_args.kwargs["params"]["key"], "flag_key")
+
+    def test_missing_key_and_env_exits_with_code_2(self):
+        env_without_key = {k: v for k, v in os.environ.items() if k != API_KEY_ENV_VAR}
+        with patch.dict(os.environ, env_without_key, clear=True):
+            with patch("sys.argv", ["prog", "Paris"]):
+                with self.assertRaises(SystemExit) as ctx:
+                    main()
         self.assertEqual(ctx.exception.code, 2)
 
 
